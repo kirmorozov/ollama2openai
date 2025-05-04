@@ -1,76 +1,129 @@
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
-import openai
+from fastapi.responses import JSONResponse, PlainTextResponse
 import os
+
+import openai
+
 app = FastAPI()
-# Set OpenAI API key and URL
-openai.api_key = os.environ.get("OPENAI_API_KEY")
-openai.api_base = os.environ.get("OPENAI_API_URL")
-# Define a function to get the list of available models from OpenAI API
+
+client = openai.OpenAI(
+    # This is the default and can be omitted
+    api_key=os.environ.get("OPENAI_API_KEY"),
+    base_url=os.environ.get("OPENAI_API_URL"),
+)
+
+
 def get_models():
-    response = openai.Model.list()
-    models = [{"name": model.name, "description": model.description} for model in response.data]
-    return models
-# Define a function to generate a response to user input
-def generate_response(model_name, prompt, temperature=0.7, max_tokens=2048, top_p=1.0):
-    response = openai.Completion.create(
-        model=model_name,
-        prompt=prompt,
-        max_tokens=max_tokens,
-        temperature=temperature,
-        top_p=top_p,
-    )
-    return response.choices[0].text
-# Define a route for the chat endpoint
+    try:
+        response = client.models.list()
+        return response.data
+    except Exception as e:
+        print(f"Error getting models: {e}")
+        return []
+
+def generate_chat_response(model_name, messages, temperature=0.7, max_tokens=2048, top_p=1.0):
+    """
+    Generate a chat response using the OpenAI API.
+
+    Args:
+    - model_name (str): The name of the model to use.
+    - messages (list): A list of messages to send to the model.
+    - temperature (float, optional): The temperature to use for the model. Defaults to 0.7.
+    - max_tokens (int, optional): The maximum number of tokens to generate. Defaults to 2048.
+    - top_p (float, optional): The top-p value to use for the model. Defaults to 1.0.
+
+    Returns:
+    - str: The generated chat response.
+    """
+    try:
+        # Create the completion request
+        response = client.chat.completions.create(
+            model=model_name,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            top_p=top_p,
+        )
+
+        # Check if the response is valid
+        if len(response.choices) > 0:
+            # Return the content of the first message in the response
+            return response.choices[0].message.content
+        else:
+            # Return an error message if the response is invalid
+            return "Invalid response from OpenAI API"
+    except openai.error.AuthenticationError:
+        # Handle authentication errors
+        return "Authentication error: please check your OpenAI API key"
+    except openai.error.APIError as e:
+        # Handle API errors
+        return f"API error: {e}"
+    except Exception as e:
+        # Handle any other exceptions
+        return f"Error: {e}"
+
 @app.post("/api/chat")
 async def chat(request: Request):
     data = await request.json()
-    message = data["message"]
+    messages = data["messages"]
     model_name = data.get("model")
     temperature = data.get("temperature", 0.7)
     max_tokens = data.get("max_tokens", 2048)
     top_p = data.get("top_p", 1.0)
+
     if model_name:
-        response = generate_response(model_name, message, temperature, max_tokens, top_p)
+        response = generate_chat_response(model_name, messages, temperature, max_tokens, top_p)
     else:
-        # Use the first model in the list if no model is specified
         models = get_models()
         if models:
             model_name = models[0]["name"]
-            response = generate_response(model_name, message, temperature, max_tokens, top_p)
+            response = generate_chat_response(model_name, messages, temperature, max_tokens, top_p)
         else:
             return JSONResponse(content={"error": "No models available"}, media_type="application/json")
-    return JSONResponse(content={"response": response}, media_type="application/json")
-# Define a route for the version endpoint
+
+    res = {
+        "model": model_name,
+        "message": {
+            "role": "assistant",
+            "content": response
+        }
+    }
+    return JSONResponse(content=res, media_type="application/json")
+
 @app.get("/api/version")
 async def version():
     return JSONResponse(content={"version": "1.0"}, media_type="application/json")
-# Define a route for the tags endpoint
+
 @app.get("/api/tags")
 async def tags():
-    models = get_models()
-    return JSONResponse(content=[model["name"] for model in models], media_type="application/json")
-# Define a route for the show endpoint
-@app.get("/api/show")
-async def show():
-    return JSONResponse(content={"message": "LLaMA API is working"}, media_type="application/json")
-# Define a route for the generate endpoint
-@app.post("/api/generate")
-async def generate(request: Request):
-    data = await request.json()
-    prompt = data["prompt"]
-    model_name = data.get("model")
-    temperature = data.get("temperature", 0.7)
-    max_tokens = data.get("max_tokens", 2048)
-    top_p = data.get("top_p", 1.0)
-    if model_name:
-        response = generate_response(model_name, prompt, temperature, max_tokens, top_p)
-    else:
-        # Use the first model in the list if no model is specified
-        models = get_models()
-        if models:
-            model_name = models[0]["name"]
-            response = generate_response(model_name, prompt, temperature, max_tokens, top_p)
-        else:
-            return JSONResponse(content={"error": "No models available"}, media_type="application/json")
-    return JSONResponse(content={"response": response}, media_type="application/json")
+    modelsList = get_models()
+    models = []
+    for model in modelsList:
+        model_info = {
+            "name": model.id,
+            "model": model.id,
+            "modified_at": model.created,
+            "size": 0,  # OpenAI API does not provide model size
+            "digest": model.id,  # OpenAI API does not provide model digest
+            "details": {
+                "parent_model": "",  # OpenAI API does not provide parent model
+                "format": "",  # OpenAI API does not provide model format
+                "family": "",  # OpenAI API does not provide model family
+                "families": [],  # OpenAI API does not provide model families
+                "parameter_size": "",  # OpenAI API does not provide model parameter size
+                "quantization_level": ""  # OpenAI API does not provide model quantization level
+            }
+        }
+        models.append(model_info)
+    return JSONResponse(content={"models": models}, media_type="application/json")
+
+@app.post("/api/show")
+async def show(reqyest: Request):
+    res = {"capabilities": [
+        "completion"
+    ]}
+    return JSONResponse(content=res, media_type="application/json")
+
+@app.get("/", response_class=PlainTextResponse)
+async def root():
+    return "Ollama is running, ollama2openai"
