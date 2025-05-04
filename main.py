@@ -1,3 +1,4 @@
+import time
 from fastapi import FastAPI, Request
 from fastapi.responses import Response, JSONResponse, PlainTextResponse
 import os
@@ -110,26 +111,38 @@ async def version():
 
 @app.get("/api/tags")
 async def tags():
-    modelsList = get_models()
-    models = []
-    for model in modelsList:
-        model_info = {
-            "name": model.id,
-            "model": model.id,
-            "modified_at": model.created,
-            "size": 0,  # OpenAI API does not provide model size
-            "digest": model.id,  # OpenAI API does not provide model digest
-            "details": {
-                "parent_model": "",  # OpenAI API does not provide parent model
-                "format": "",  # OpenAI API does not provide model format
-                "family": "",  # OpenAI API does not provide model family
-                "families": [],  # OpenAI API does not provide model families
-                "parameter_size": "",  # OpenAI API does not provide model parameter size
-                "quantization_level": ""  # OpenAI API does not provide model quantization level
-            }
+    # Simple in-memory cache that lasts for 24 hours
+    if not hasattr(tags, "cache"):
+        tags.cache = {
+            "result": [],
+            "timestamp": 0
         }
-        models.append(model_info)
-    return JSONResponse(content={"models": models}, media_type="application/json")
+
+    # Cache TTL (Time To Live) - 24 hours (86400 seconds)
+    if time.time() - tags.cache["timestamp"] > 86400:
+        modelsList = get_models()
+        models = []
+        for model in modelsList:
+            model_info = {
+                "name": model.id,
+                "model": model.id,
+                "modified_at": model.created,
+                "size": 0,
+                "digest": model.id,
+                "details": {
+                    "parent_model": "",
+                    "format": "",
+                    "family": "",
+                    "families": [],
+                    "parameter_size": "",
+                    "quantization_level": ""
+                }
+            }
+            models.append(model_info)
+        tags.cache["result"] = models
+        tags.cache["timestamp"] = time.time()
+
+    return JSONResponse(content={"models": tags.cache["result"]}, media_type="application/json")
 
 @app.post("/api/show")
 async def show(reqyest: Request):
