@@ -1,8 +1,9 @@
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import Response, JSONResponse, PlainTextResponse
 import os
 
 import openai
+
 
 app = FastAPI()
 
@@ -46,12 +47,14 @@ def generate_chat_response(model_name, messages, temperature=0.7, max_tokens=204
         )
 
         # Check if the response is valid
-        if len(response.choices) > 0:
+        if response.choices is not None:
             # Return the content of the first message in the response
             return response.choices[0].message.content
         else:
             # Return an error message if the response is invalid
-            return "Invalid response from OpenAI API"
+            if "error" in response.model_extra:
+                return response.model_extra['error']["message"]
+            return "No choices!!!"
     except openai.error.AuthenticationError:
         # Handle authentication errors
         return "Authentication error: please check your OpenAI API key"
@@ -64,6 +67,14 @@ def generate_chat_response(model_name, messages, temperature=0.7, max_tokens=204
 
 @app.post("/api/chat")
 async def chat(request: Request):
+
+    if "upgrade" in request.headers.keys() and "http2-settings" in request.headers:
+        return Response(
+            status_code=426,
+            headers={"Upgrade": "HTTP/1.1"},
+            content="HTTP/2 upgrade rejected"
+        )
+
     data = await request.json()
     messages = data["messages"]
     model_name = data.get("model")
@@ -86,7 +97,10 @@ async def chat(request: Request):
         "message": {
             "role": "assistant",
             "content": response
-        }
+        },
+        "done_reason": "stop",
+        "done": True,
+        "stream": False
     }
     return JSONResponse(content=res, media_type="application/json")
 
@@ -126,4 +140,4 @@ async def show(reqyest: Request):
 
 @app.get("/", response_class=PlainTextResponse)
 async def root():
-    return "Ollama is running, ollama2openai"
+    return "Ollama is running, ollama2openai really works"
