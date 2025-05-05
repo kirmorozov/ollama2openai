@@ -14,6 +14,27 @@ client = openai.OpenAI(
     base_url=os.environ.get("OPENAI_API_URL"),
 )
 
+def skip_lines_before_and_including_target(text, target_line):
+    """
+    Skip all lines before and including the target line within a text string.
+
+    Args:
+        text (str): The input text containing line breaks.
+        target_line (str): The line up to which we want to skip.
+
+    Returns:
+        str: The text after and excluding the target line.
+    """
+    lines = text.split('\n')
+    try:
+        index = lines.index(target_line)
+        # Slice the list to exclude all lines up to and including the target
+        remaining_lines = lines[index + 1:]
+        return '\n'.join(remaining_lines)
+    except ValueError:
+        # If target line is not found, return the original text
+        return text
+
 
 def get_models():
     try:
@@ -77,6 +98,7 @@ async def chat(request: Request):
         )
 
     data = await request.json()
+    print(f"Question: {data}")
     messages = data["messages"]
     model_name = data.get("model")
     temperature = data.get("temperature", 0.7)
@@ -103,6 +125,7 @@ async def chat(request: Request):
         "done": True,
         "stream": False
     }
+    print(f"Answer: {response}")
     return JSONResponse(content=res, media_type="application/json")
 
 @app.get("/api/version")
