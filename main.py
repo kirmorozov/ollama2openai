@@ -5,6 +5,12 @@ import os
 
 import openai
 
+skip_think_prefixes = [
+    "*Original file:*",
+    "Given the below code differences (diffs)"]
+skip_think_suffixes = [
+    "please provide five improved names for this variable."
+]
 
 app = FastAPI()
 
@@ -127,11 +133,6 @@ async def chat(request: Request):
                 if message['content'].endswith(suffix):
                     return filter_out_think(response), True
         return response, False
-
-    skip_think_prefixes = [
-        "*Original file:*",
-        "Given the below code differences (diffs)"]
-    skip_think_suffixes = ["please provide five improved names for this variable."]
 
     response, skipped_think = check_message_content(messages, skip_think_prefixes, skip_think_suffixes, response)
 
