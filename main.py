@@ -37,8 +37,9 @@ def filter_out_think(text):
     for line in allLines:
         if line.startswith(start_line):
             skip = True
-        if line.startswith(end_line):
+        if skip and line.startswith(end_line):
             skip = False
+            continue
         if not skip:
             filteredLines.append(line)
     return "\n".join(filteredLines).strip()
