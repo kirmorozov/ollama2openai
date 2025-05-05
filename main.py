@@ -14,26 +14,28 @@ client = openai.OpenAI(
     base_url=os.environ.get("OPENAI_API_URL"),
 )
 
-def skip_lines_before_and_including_target(text, target_line):
+def filter_out_think(text):
     """
-    Skip all lines before and including the target line within a text string.
+    Skip all think lines. Everything starting <think> ending </think>
 
     Args:
         text (str): The input text containing line breaks.
-        target_line (str): The line up to which we want to skip.
-
     Returns:
-        str: The text after and excluding the target line.
+        str: The text after and excluding thinking section.
     """
-    lines = text.split('\n')
-    try:
-        index = lines.index(target_line)
-        # Slice the list to exclude all lines up to and including the target
-        remaining_lines = lines[index + 1:]
-        return '\n'.join(remaining_lines)
-    except ValueError:
-        # If target line is not found, return the original text
-        return text
+    start_line = "<think>"
+    end_line = "</think>"
+    allLines = text.split("\n")
+    skip = False
+    filteredLines = []
+    for line in allLines:
+        if line.startswith(start_line):
+            skip = True
+        if line.startswith(end_line):
+            skip = False
+        if not skip:
+            filteredLines.append(line)
+    return "\n".join(filteredLines).strip()
 
 
 def get_models():
@@ -119,11 +121,11 @@ async def chat(request: Request):
         for prefix in prefixes:
             for message in messages:
                 if message['content'].startswith(prefix):
-                    return skip_lines_before_and_including_target(response, "</think>"), True
+                    return filter_out_think(response), True
         for suffix in suffixes:
             for message in messages:
                 if message['content'].endswith(suffix):
-                    return skip_lines_before_and_including_target(response, "</think>"), True
+                    return filter_out_think(response), True
         return response, False
 
     skip_think_prefixes = [
@@ -195,4 +197,4 @@ async def show(reqyest: Request):
 
 @app.get("/", response_class=PlainTextResponse)
 async def root():
-    return "Ollama is running, ollama2openai really works"
+    return "Ollama is running, ollama2openi really works"
