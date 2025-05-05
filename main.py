@@ -115,6 +115,24 @@ async def chat(request: Request):
         else:
             return JSONResponse(content={"error": "No models available"}, media_type="application/json")
 
+    def check_message_content(messages, prefixes, suffixes, response):
+        for prefix in prefixes:
+            for message in messages:
+                if message['content'].startswith(prefix):
+                    return skip_lines_before_and_including_target(response, "</think>"), True
+        for suffix in suffixes:
+            for message in messages:
+                if message['content'].endswith(suffix):
+                    return skip_lines_before_and_including_target(response, "</think>"), True
+        return response, False
+
+    skip_think_prefixes = [
+        "*Original file:*",
+        "Given the below code differences (diffs)"]
+    skip_think_suffixes = ["please provide five improved names for this variable."]
+
+    response, skipped_think = check_message_content(messages, skip_think_prefixes, skip_think_suffixes, response)
+
     res = {
         "model": model_name,
         "message": {
@@ -123,7 +141,8 @@ async def chat(request: Request):
         },
         "done_reason": "stop",
         "done": True,
-        "stream": False
+        "stream": False,
+        "skipped_think": skipped_think
     }
     print(f"Answer: {response}")
     return JSONResponse(content=res, media_type="application/json")
