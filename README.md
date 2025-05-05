@@ -23,38 +23,14 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
 ## Gow to use it with JetBrains AI Assistant
+
 Point your AI Assistant to use the service:
 ![Settings](docs/ai-assistant-setup.png)
 
 
 ## API Documentation
 
-### Base API
-
-`GET /`
-- Description: Health check endpoint
-- Response: `{"status": "ok"}`
-
-### Models API
-
-`GET /api/models`
-- Description: List available models
-- Response: `{"models": [{"name": "gpt-3.5-turbo", "description": "..."}, ...]}`
-- Example: `curl http://localhost:8000/api/models`
-
-### Chat Completion API
-
-`POST /api/chat/completions`
-- Description: Generate responses using the specified model
-- Request Body:
-  ```json
-  {
-    "model": "gpt-3.5-turbo",
-    "messages": [{"role": "user", "content": "Hello!"}]
-  }
-  ```
-- Response: `{"choices": [{"message": {"role": "assistant", "content": "..."}}]}`
-- Example: `curl -X POST http://localhost:8000/api/chat/completions -H "Content-Type: application/json" -d '{"model": "gpt-3.5-turbo", "messages": [{"role": "user", "content": "Hello!"}]}'`
+Trying to follow [Ollama REST](https://www.postman.com/postman-student-programs/ollama-api/collection/suc47x8/ollama-rest-api) api.
 
 ## Project Notes
 
@@ -64,4 +40,7 @@ Point your AI Assistant to use the service:
 - Supports SambaNova models through OpenAI API compatibility
 
 ## Other attempts to do about the same
-ollama-proxy
+
+[ollama-proxy](https://pypi.org/project/ollama-proxy/) - Abandoned
+
+[enchanted-ollama-openrouter-proxy](https://github.com/xsharov/enchanted-ollama-openrouter-proxy/tree/main) - Proxy to use with OpenRouter
