@@ -1,3 +1,4 @@
+import hashlib
 import time
 from fastapi import FastAPI, Request
 from fastapi.responses import Response, JSONResponse, PlainTextResponse
@@ -5,12 +6,7 @@ import os
 
 import openai
 
-skip_think_prefixes = [
-    "*Original file:*",
-    "Given the below code differences (diffs)"]
-skip_think_suffixes = [
-    "please provide five improved names for this variable."
-]
+always_skip_think = True
 
 app = FastAPI()
 
@@ -31,18 +27,18 @@ def filter_out_think(text):
     """
     start_line = "<think>"
     end_line = "</think>"
-    allLines = text.split("\n")
+    all_output_lines = text.split("\n")
     skip = False
-    filteredLines = []
-    for line in allLines:
+    filtered_lines = []
+    for line in all_output_lines:
         if line.startswith(start_line):
             skip = True
         if skip and line.startswith(end_line):
             skip = False
             continue
         if not skip:
-            filteredLines.append(line)
-    return "\n".join(filteredLines).strip()
+            filtered_lines.append(line)
+    return "\n".join(filtered_lines).strip()
 
 
 def get_models():
@@ -124,18 +120,14 @@ async def chat(request: Request):
         else:
             return JSONResponse(content={"error": "No models available"}, media_type="application/json")
 
-    def check_message_content(messages, prefixes, suffixes, response):
-        for prefix in prefixes:
-            for message in messages:
-                if message['content'].startswith(prefix):
-                    return filter_out_think(response), True
-        for suffix in suffixes:
-            for message in messages:
-                if message['content'].endswith(suffix):
-                    return filter_out_think(response), True
+    def check_message_content(response):
+        if always_skip_think:
+            # First check if response starts with <think>
+            if response and response.split('\n')[0].strip().startswith('<think>'):
+                return filter_out_think(response), True
         return response, False
 
-    response, skipped_think = check_message_content(messages, skip_think_prefixes, skip_think_suffixes, response)
+    response, skipped_think = check_message_content(response)
 
     res = {
         "model": model_name,
